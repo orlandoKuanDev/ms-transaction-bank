@@ -5,6 +5,7 @@ import com.example.mstransaction.models.entities.Bill;
 import com.example.mstransaction.models.entities.Transaction;
 import com.example.mstransaction.services.BillService;
 import com.example.mstransaction.services.ITransactionService;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
@@ -22,6 +23,7 @@ import java.util.List;
 import java.util.Map;
 
 @Component
+@Slf4j(topic = "TRANSACTION_HANDLER")
 public class TransactionHandler {
 
     private final ITransactionService transactionService;
@@ -98,16 +100,34 @@ public class TransactionHandler {
 
     public Mono<ServerResponse> findAllByAccountNumber(ServerRequest request){
         String accountNumber = request.pathVariable("accountNumber");
+        log.info("ACCOUNT_NUMBER {}", accountNumber);
         Mono<Bill> bill = billService.findByAccountNumber(accountNumber);
         return bill.flatMap(acc -> transactionService.findAll()
-                .filter(list -> list.getBill().getAccountNumber().equals(acc.getAccountNumber()))
+                .filter(list -> {
+                    log.info("ACCOUNT_NUMBER_WEB_CLIENT {}", acc.getAccountNumber());
+                    log.info("ACCOUNT_NUMBER_WEB_CLIENT {}", list.getBill());
+                    return list.getBill().getAccountNumber().equals(acc.getAccountNumber());
+                })
                 .collectList())
                 .flatMap(list -> ServerResponse.ok()
                 .contentType(MediaType.APPLICATION_JSON)
                 .bodyValue(list)
                 .onErrorResume(e -> Mono.error(new MethodArgumentNotValid(
-                        HttpStatus.BAD_REQUEST, String.format("The argument %s is not valid for this method", accountNumber), e))));
+                        HttpStatus.BAD_REQUEST, String.format("The argument %s is not valid for this method", accountNumber), e)))
+        );
 	}
+
+    public Mono<ServerResponse> findAllByCreditCard(ServerRequest request){
+        String cardNumber = request.pathVariable("cardNumber");
+        return transactionService.findAll()
+                .filter(list -> list.getCreditCard().getCardNumber().equals(cardNumber))
+                .collectList()
+                .flatMap(list -> ServerResponse.ok()
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .bodyValue(list)
+                        .onErrorResume(e -> Mono.error(new MethodArgumentNotValid(
+                                HttpStatus.BAD_REQUEST, String.format("The argument %s is not valid for this method", cardNumber), e))));
+    }
 
     private Mono<ServerResponse> errorHandler(Mono<ServerResponse> response){
         return response.onErrorResume(error -> {
