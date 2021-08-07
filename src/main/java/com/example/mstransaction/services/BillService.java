@@ -1,60 +1,54 @@
 package com.example.mstransaction.services;
 
+import com.example.mstransaction.exception.webclient.ArgumentWebClientNotValid;
 import com.example.mstransaction.models.entities.Bill;
-import io.netty.channel.ChannelOption;
-import io.netty.handler.timeout.ReadTimeoutHandler;
-import io.netty.handler.timeout.WriteTimeoutHandler;
+import com.example.mstransaction.utils.CustomMessage;
+import lombok.extern.slf4j.Slf4j;
+import org.slf4j.Logger;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.http.HttpHeaders;
-import org.springframework.http.MediaType;
-import org.springframework.http.client.reactive.ReactorClientHttpConnector;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
+import org.springframework.web.reactive.function.client.ClientResponse;
 import org.springframework.web.reactive.function.client.WebClient;
 import reactor.core.publisher.Mono;
-import reactor.netty.http.client.HttpClient;
-import reactor.netty.tcp.TcpClient;
+import reactor.core.scheduler.Schedulers;
 
 import java.util.Collections;
-import java.util.concurrent.TimeUnit;
 
 import static org.springframework.http.MediaType.APPLICATION_JSON;
-import static org.springframework.http.MediaType.APPLICATION_JSON_UTF8;
 
 @Service
+@Slf4j(topic = "BILL_WEBCLIENT_SERVICE")
 public class BillService {
     private final WebClient.Builder webClientBuilder;
+    private final CustomMessage customMessage;
+
     @Autowired
-    public BillService(WebClient.Builder webClientBuilder) {
+    public BillService(WebClient.Builder webClientBuilder, CustomMessage customMessage) {
         this.webClientBuilder = webClientBuilder;
+        this.customMessage = customMessage;
     }
 
-    //define timeout
-    TcpClient tcpClient = TcpClient
-            .create()
-            .option(ChannelOption.CONNECT_TIMEOUT_MILLIS, 5000)
-            .doOnConnected(connection -> {
-                connection.addHandlerLast(new ReadTimeoutHandler(5000, TimeUnit.MILLISECONDS));
-                connection.addHandlerLast(new WriteTimeoutHandler(5000, TimeUnit.MILLISECONDS));
-            });
-
-    /*public Mono<Bill> findByAccountNumber(String accountNumber) {
-        WebClient client = webClientBuilder.clientConnector(new ReactorClientHttpConnector(HttpClient.from(tcpClient)))
-                .baseUrl("http://SERVICE-BILL")
-                .defaultHeader(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
-                .defaultUriVariables(Collections.singletonMap("url", "http://SERVICE-BILL"))
-                .build();
-
-        return client.get()
-                .uri("/{accountNumber}", Collections.singletonMap("accountNumber", accountNumber))
-                .accept(APPLICATION_JSON)
-                .retrieve()
-                .bodyToMono(Bill.class);
-    }*/
     public Mono<Bill> findByAccountNumber(String accountNumber) {
         return webClientBuilder.build().get().uri("/acc/{accountNumber}", Collections.singletonMap("accountNumber", accountNumber))
                 .accept(APPLICATION_JSON)
                 .retrieve()
+                .onStatus(HttpStatus::isError, response -> {
+                    logTraceResponse(log, response);
+                    return Mono.error(new ArgumentWebClientNotValid(
+                            String.format("THE ACCOUNT NUMBER DONT EXIST IN MICRO SERVICE BILL-> %s", accountNumber)
+                    ));
+                })
                 .bodyToMono(Bill.class);
     }
 
+    public static void logTraceResponse(Logger log, ClientResponse response) {
+        if (log.isTraceEnabled()) {
+            log.trace("Response status: {}", response.statusCode());
+            log.trace("Response headers: {}", response.headers().asHttpHeaders());
+            response.bodyToMono(String.class)
+                    .publishOn(Schedulers.boundedElastic())
+                    .subscribe(body -> log.trace("Response body: {}", body));
+        }
+    }
 }

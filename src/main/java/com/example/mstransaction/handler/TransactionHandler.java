@@ -1,5 +1,6 @@
 package com.example.mstransaction.handler;
 
+import com.example.mstransaction.exception.MethodArgumentNotValid;
 import com.example.mstransaction.models.entities.Bill;
 import com.example.mstransaction.models.entities.Transaction;
 import com.example.mstransaction.services.BillService;
@@ -104,32 +105,10 @@ public class TransactionHandler {
                 .flatMap(list -> ServerResponse.ok()
                 .contentType(MediaType.APPLICATION_JSON)
                 .bodyValue(list)
-                .onErrorResume(e -> Mono.just("Error " + e.getMessage())
-                        .flatMap(s -> ServerResponse.ok()
-                                .contentType(MediaType.TEXT_PLAIN)
-                                .bodyValue(s)))
-                .switchIfEmpty(ServerResponse.notFound().build())
-        );
-//        return errorHandler(
-//            transactionService.findAll().filter(list -> list.getBill().getAccountNumber().equals(accountNumber))
-//                    .collectList()
-//                    .flatMap(list -> ServerResponse.ok()
-//                            .contentType(MediaType.APPLICATION_JSON)
-//                            .bodyValue(list)
-//                            .switchIfEmpty(ServerResponse.notFound().build())
-//                    )
-//        );
+                .onErrorResume(e -> Mono.error(new MethodArgumentNotValid(
+                        HttpStatus.BAD_REQUEST, String.format("The argument %s is not valid for this method", accountNumber), e))));
 	}
-    /*
-     Mono<Bill> bill = billService.findByAccountNumber(accountNumber);
-		return  errorHandler( bill.flatMap(acc -> {
-            Mono<List<Transaction>> listTransactionsByAccountNumber = transactionService.findAllByBill_AccountNumber(acc.getAccountNumber());
-            return listTransactionsByAccountNumber;
-        }).flatMap(listTransactions -> ServerResponse.ok()
-                .contentType(MediaType.APPLICATION_JSON)
-                .bodyValue(listTransactions)));
 
-     */
     private Mono<ServerResponse> errorHandler(Mono<ServerResponse> response){
         return response.onErrorResume(error -> {
             WebClientResponseException errorResponse = (WebClientResponseException) error;
