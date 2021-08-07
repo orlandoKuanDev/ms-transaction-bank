@@ -11,7 +11,7 @@ import org.springframework.data.mongodb.core.mapping.Document;
 import org.springframework.data.mongodb.core.mapping.Field;
 
 @JsonInclude(JsonInclude.Include.NON_NULL)
-@Document(collection = "account")
+@Document(collection = "bill")
 @Data
 @AllArgsConstructor
 @NoArgsConstructor
