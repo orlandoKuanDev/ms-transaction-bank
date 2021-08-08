@@ -23,6 +23,6 @@ public class Bill {
     @Field(name = "accountNumber")
     private String accountNumber;
 
-    @Field(name = "currentBalance")
-    private Double currentBalance;
+    @Field(name = "balance")
+    private Double balance;
 }

@@ -30,7 +30,11 @@ public class BillService {
     }
 
     public Mono<Bill> findByAccountNumber(String accountNumber) {
-        return webClientBuilder.build().get().uri("/acc/{accountNumber}", Collections.singletonMap("accountNumber", accountNumber))
+        return webClientBuilder
+                .baseUrl("http://SERVICE-BILL/bill")
+                .build()
+                .get()
+                .uri("/acc/{accountNumber}", Collections.singletonMap("accountNumber", accountNumber))
                 .accept(APPLICATION_JSON)
                 .retrieve()
                 .onStatus(HttpStatus::isError, response -> {

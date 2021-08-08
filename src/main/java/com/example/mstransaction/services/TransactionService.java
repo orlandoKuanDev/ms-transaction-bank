@@ -11,6 +11,7 @@ import java.util.List;
 
 @Service
 public class TransactionService extends BaseService<Transaction, String> implements ITransactionService{
+
     private final ITransactionRepository repository;
 
     @Autowired

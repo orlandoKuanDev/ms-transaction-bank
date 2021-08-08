@@ -2,6 +2,7 @@ package com.example.mstransaction.handler;
 
 import com.example.mstransaction.exception.MethodArgumentNotValid;
 import com.example.mstransaction.models.entities.Bill;
+import com.example.mstransaction.models.entities.CreditCard;
 import com.example.mstransaction.models.entities.Transaction;
 import com.example.mstransaction.services.BillService;
 import com.example.mstransaction.services.ITransactionService;
@@ -21,6 +22,8 @@ import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+
+import static org.springframework.http.MediaType.APPLICATION_JSON;
 
 @Component
 @Slf4j(topic = "TRANSACTION_HANDLER")
@@ -59,9 +62,25 @@ public class TransactionHandler {
         );
     }
 
+    /*public Mono<ServerResponse> update(ServerRequest request){
+        Mono<Bill> bill = request.bodyToMono(Bill.class);
+        log.info("BILL_FROM_RETIRE {}", bill);
+        return bill.flatMap(billEdit -> billService.findByAccountNumber(billEdit.getAccountNumber())
+                        .flatMap(currentBill -> {
+                            currentBill.setAccountNumber(billEdit.getAccountNumber());
+                            currentBill.setBalance(billEdit.getBalance());
+                            currentBill.setDateOpened(null);
+                            currentBill.setLimitMovementsMonth(10);
+                            return billService.update(currentBill);
+                        })).flatMap(billUpdate -> ServerResponse.created(URI.create("/bill/".concat(billUpdate.getId())))
+                        .contentType(APPLICATION_JSON)
+                        .bodyValue(billUpdate))
+                .onErrorResume(e -> Mono.error(new RuntimeException("Error update bill")));
+    }*/
+
     public Mono<ServerResponse> save(ServerRequest request){
-        Mono<Transaction> product = request.bodyToMono(Transaction.class);
-        return product.flatMap(transactionService::create)
+        Mono<Transaction> transaction = request.bodyToMono(Transaction.class);
+        return transaction.flatMap(transactionCreate -> transactionService.create(transactionCreate))
                 .flatMap(p -> ServerResponse.created(URI.create("/api/client/".concat(p.getId())))
                         .contentType(MediaType.APPLICATION_JSON)
                         .bodyValue(p))

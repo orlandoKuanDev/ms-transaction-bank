@@ -19,7 +19,7 @@ public class RouterConfig {
                 .andRoute(GET("/transaction/acc/{accountNumber}"), handler::findByAccountNumber)
                 .andRoute(GET("/transaction/bill/{accountNumber}"), handler::findAllByAccountNumber)
                 .andRoute(GET("/transaction/creditCard/{cardNumber}"), handler::findAllByCreditCard)
-                .andRoute(POST("/transaction"), handler::save)
+                .andRoute(POST("/transaction/create"), handler::save)
                 .andRoute(PUT("/transaction/{id}"), handler::update)
                 .andRoute(DELETE("/transaction/{id}"), handler::delete);
 
