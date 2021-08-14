@@ -8,12 +8,8 @@ import org.springframework.data.annotation.Id;
 import org.springframework.data.mongodb.core.mapping.Field;
 
 @JsonInclude(JsonInclude.Include.NON_NULL)
-@JsonIgnoreProperties(ignoreUnknown = true)
 @Data
-@Builder
 public class Product {
-    @Id
-    private String id;
 
     @Field(name = "productName")
     private String productName;

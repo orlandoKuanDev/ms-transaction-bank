@@ -9,6 +9,11 @@ import lombok.Data;
 @JsonIgnoreProperties(ignoreUnknown = true)
 public class Rules {
 
-    private Integer monthlyTransactionLimit;
+    private String customerType;
+
+    private boolean commissionMaintenance;
+
+    private boolean maximumLimitMonthlyMovements;
+    private Integer maximumLimitMonthlyMovementsQuantity;
 
 }

@@ -7,7 +7,6 @@ import org.springframework.data.mongodb.core.mapping.Document;
 import org.springframework.data.mongodb.core.mapping.Field;
 
 @JsonInclude(JsonInclude.Include.NON_NULL)
-@Document(collection = "credit_card")
 @Data
 public class CreditCard {
     @Id

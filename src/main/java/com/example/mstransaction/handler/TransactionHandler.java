@@ -1,9 +1,10 @@
 package com.example.mstransaction.handler;
 
 import com.example.mstransaction.exception.MethodArgumentNotValid;
+import com.example.mstransaction.models.entities.Acquisition;
 import com.example.mstransaction.models.entities.Bill;
-import com.example.mstransaction.models.entities.CreditCard;
 import com.example.mstransaction.models.entities.Transaction;
+import com.example.mstransaction.services.AcquisitionService;
 import com.example.mstransaction.services.BillService;
 import com.example.mstransaction.services.ITransactionService;
 import lombok.extern.slf4j.Slf4j;
@@ -14,27 +15,27 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.reactive.function.client.WebClientResponseException;
 import org.springframework.web.reactive.function.server.ServerRequest;
 import org.springframework.web.reactive.function.server.ServerResponse;
-import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
 import java.net.URI;
+import java.time.LocalDateTime;
 import java.util.Date;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
-
-import static org.springframework.http.MediaType.APPLICATION_JSON;
 
 @Component
 @Slf4j(topic = "TRANSACTION_HANDLER")
 public class TransactionHandler {
-
+    public static final Double COMMISSION_PER_TRANSACTION = 2.5;
     private final ITransactionService transactionService;
     private final BillService billService;
+    private final AcquisitionService acquisitionService;
+
     @Autowired
-    public TransactionHandler(ITransactionService transactionService, BillService billService) {
+    public TransactionHandler(ITransactionService transactionService, BillService billService, AcquisitionService acquisitionService) {
         this.transactionService = transactionService;
         this.billService = billService;
+        this.acquisitionService = acquisitionService;
     }
 
     public Mono<ServerResponse> findAll(ServerRequest request){
@@ -62,37 +63,47 @@ public class TransactionHandler {
         );
     }
 
-    /*public Mono<ServerResponse> update(ServerRequest request){
-        Mono<Bill> bill = request.bodyToMono(Bill.class);
-        log.info("BILL_FROM_RETIRE {}", bill);
-        return bill.flatMap(billEdit -> billService.findByAccountNumber(billEdit.getAccountNumber())
-                        .flatMap(currentBill -> {
-                            currentBill.setAccountNumber(billEdit.getAccountNumber());
-                            currentBill.setBalance(billEdit.getBalance());
-                            currentBill.setDateOpened(null);
-                            currentBill.setLimitMovementsMonth(10);
-                            return billService.update(currentBill);
-                        })).flatMap(billUpdate -> ServerResponse.created(URI.create("/bill/".concat(billUpdate.getId())))
-                        .contentType(APPLICATION_JSON)
-                        .bodyValue(billUpdate))
-                .onErrorResume(e -> Mono.error(new RuntimeException("Error update bill")));
-    }*/
-
     public Mono<ServerResponse> save(ServerRequest request){
         Mono<Transaction> transaction = request.bodyToMono(Transaction.class);
-        return transaction.flatMap(transactionCreate -> transactionService.create(transactionCreate))
-                .flatMap(p -> ServerResponse.created(URI.create("/api/client/".concat(p.getId())))
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .bodyValue(p))
-                .onErrorResume(error -> {
-                    WebClientResponseException errorResponse = (WebClientResponseException) error;
-                    if(errorResponse.getStatusCode() == HttpStatus.BAD_REQUEST) {
-                        return ServerResponse.badRequest()
-                                .contentType(MediaType.APPLICATION_JSON)
-                                .bodyValue(errorResponse.getResponseBodyAsString());
+        Transaction newTransaction = new Transaction();
+        return transaction.flatMap(transactionRequest -> {
+                    newTransaction.setTransactionType(transactionRequest.getTransactionType());
+                    newTransaction.setTransactionAmount(transactionRequest.getTransactionAmount());
+                    newTransaction.setDescription(transactionRequest.getDescription());
+                    newTransaction.setTransactionDate(LocalDateTime.now());
+
+                    if (transactionRequest
+                            .getBill()
+                            .getAcquisition()
+                            .getProduct()
+                            .getRules()
+                            .getMaximumLimitMonthlyMovementsQuantity() > 10){
+                        newTransaction.setCommission(2.5);
+                        transactionRequest
+                                .getBill()
+                                .setBalance(transactionRequest.getBill().getBalance() - COMMISSION_PER_TRANSACTION);
                     }
-                    return Mono.error(errorResponse);
-                });
+                        transactionRequest
+                                .getBill()
+                                .getAcquisition()
+                                .getProduct()
+                                .getRules()
+                                .setMaximumLimitMonthlyMovementsQuantity(20);
+                        acquisitionService.updateAcquisition( transactionRequest
+                                        .getBill()
+                                        .getAcquisition(),
+                                         transactionRequest
+                                        .getBill()
+                                        .getAcquisition().getCardNumber());
+                    return billService.updateBill(transactionRequest.getBill());
+                })
+                .flatMap(bill -> {
+                    newTransaction.setBill(bill);
+                    return transactionService.create(newTransaction);
+                })
+                .flatMap(transactionResponse -> ServerResponse.created(URI.create("/api/transaction/".concat(transactionResponse.getId())))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .bodyValue(transactionResponse));
     }
 
     public Mono<ServerResponse> update(ServerRequest request){
@@ -136,7 +147,7 @@ public class TransactionHandler {
         );
 	}
 
-    public Mono<ServerResponse> findAllByCreditCard(ServerRequest request){
+    /*public Mono<ServerResponse> findAllByCreditCard(ServerRequest request){
         String cardNumber = request.pathVariable("cardNumber");
         return transactionService.findAll()
                 .filter(list -> list.getCreditCard().getCardNumber().equals(cardNumber))
@@ -146,7 +157,7 @@ public class TransactionHandler {
                         .bodyValue(list)
                         .onErrorResume(e -> Mono.error(new MethodArgumentNotValid(
                                 HttpStatus.BAD_REQUEST, String.format("The argument %s is not valid for this method", cardNumber), e))));
-    }
+    }*/
 
     private Mono<ServerResponse> errorHandler(Mono<ServerResponse> response){
         return response.onErrorResume(error -> {

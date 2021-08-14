@@ -25,4 +25,8 @@ public class Bill {
 
     @Field(name = "balance")
     private Double balance;
+
+    @Field(name = "acquisition")
+    private Acquisition acquisition;
+
 }

@@ -30,10 +30,6 @@ public class Transaction {
     @Field(name = "account")
     private Bill bill;
 
-    @JsonIgnoreProperties(ignoreUnknown = true)
-    @Field(name = "credit_card")
-    private CreditCard creditCard;
-
     @Field(name = "description")
     private String description;
 
