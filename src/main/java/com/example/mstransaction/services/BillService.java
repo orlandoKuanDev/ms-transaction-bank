@@ -48,6 +48,23 @@ public class BillService {
                 .bodyToMono(Bill.class);
     }
 
+    public Mono<Bill> findByCardNumber(String cardNumber) {
+        return webClientBuilder
+                .baseUrl("http://SERVICE-BILL/bill")
+                .build()
+                .get()
+                .uri("/acquisition/{cardNumber}", Collections.singletonMap("cardNumber", cardNumber))
+                .accept(APPLICATION_JSON)
+                .retrieve()
+                .onStatus(HttpStatus::isError, response -> {
+                    logTraceResponse(logger, response);
+                    return Mono.error(new ArgumentWebClientNotValid(
+                            String.format("THE CARD NUMBER DONT EXIST IN MICRO SERVICE BILL-> %s", cardNumber)
+                    ));
+                })
+                .bodyToMono(Bill.class);
+    }
+
     public Mono<Bill> updateBill(Bill bill){
         logger.info("BILL_WEBCLIENT_UPDATE {}", bill);
         return webClientBuilder

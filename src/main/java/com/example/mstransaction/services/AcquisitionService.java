@@ -14,6 +14,10 @@ import org.springframework.web.reactive.function.client.WebClient;
 import reactor.core.publisher.Mono;
 import reactor.core.scheduler.Schedulers;
 
+import java.util.Collections;
+
+import static org.springframework.http.MediaType.APPLICATION_JSON;
+
 @Service
 @Slf4j(topic = "ACQUISITION_WEBCLIENT_SERVICE")
 public class AcquisitionService {
@@ -21,22 +25,41 @@ public class AcquisitionService {
 
     Logger logger = LoggerFactory.getLogger(AcquisitionService.class);
     @Autowired
+
     public AcquisitionService(WebClient.Builder webClientBuilder) {
         this.webClientBuilder = webClientBuilder;
     }
 
-    public Mono<Acquisition> updateAcquisition(Acquisition acquisition, String cardNumber){
+    public Mono<Acquisition> findByCardNumber(String cardNumber) {
+        return webClientBuilder
+                .baseUrl("http://SERVICE-ACQUISITION/acquisition")
+                .build()
+                .get()
+                .uri("/card/{cardNumber}", Collections.singletonMap("cardNumber", cardNumber))
+                .accept(APPLICATION_JSON)
+                .retrieve()
+                .onStatus(HttpStatus::isError, response -> {
+                    logTraceResponse(logger, response);
+                     return Mono.error(new RuntimeException("THE ACQUISITION FIND FAILED"));
+                })
+                .bodyToMono(Acquisition.class);
+    }
+
+    public Mono<Acquisition> updateAcquisition(Acquisition acquisition){
         logger.info("TRANSACTION_WEBCLIENT_UPDATE {}", acquisition);
         return webClientBuilder
                 .baseUrl("http://SERVICE-ACQUISITION/acquisition")
                 .build()
-                .put()
-                .uri("/update/{cardNumber}", cardNumber)
+                .post()
+                .uri("/update")
                 .header(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
                 .body(Mono.just(acquisition), Acquisition.class)
                 .retrieve()
                 .onStatus(HttpStatus::isError, response -> {
                     logTraceResponse(logger, response);
+                    return Mono.error(new RuntimeException("THE ACQUISITION UPDATE FAILED"));
+                })
+                .onStatus(HttpStatus::is5xxServerError, response -> {
                     return Mono.error(new RuntimeException("THE ACQUISITION UPDATE FAILED"));
                 })
                 .bodyToMono(Acquisition.class);

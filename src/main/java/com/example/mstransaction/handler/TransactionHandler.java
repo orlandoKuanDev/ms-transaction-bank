@@ -63,47 +63,76 @@ public class TransactionHandler {
         );
     }
 
+    public Mono<ServerResponse> findByAcquisitionCardNumber(ServerRequest request){
+        String cardNumber = request.pathVariable("cardNumber");
+        return errorHandler(
+                billService.findByCardNumber(cardNumber).flatMap(p -> ServerResponse.ok()
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .bodyValue(p))
+                        .switchIfEmpty(ServerResponse.notFound().build())
+        );
+    }
+
+    public Mono<ServerResponse> updateAcquisition(ServerRequest request){
+        Mono<Acquisition> acquisition = request.bodyToMono(Acquisition.class);
+        return acquisition.flatMap(acquisitionService::updateAcquisition).flatMap(p -> ServerResponse.ok()
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .bodyValue(p))
+                .switchIfEmpty(ServerResponse.notFound().build());
+    }
+
+    public Mono<ServerResponse> findByCardNumber(ServerRequest request){
+        String cardNumber = request.pathVariable("cardNumber");
+        return errorHandler(
+                acquisitionService.findByCardNumber(cardNumber).flatMap(p -> ServerResponse.ok()
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .bodyValue(p))
+                        .switchIfEmpty(ServerResponse.notFound().build())
+        );
+    }
+
     public Mono<ServerResponse> save(ServerRequest request){
         Mono<Transaction> transaction = request.bodyToMono(Transaction.class);
         Transaction newTransaction = new Transaction();
-        return transaction.flatMap(transactionRequest -> {
-                    newTransaction.setTransactionType(transactionRequest.getTransactionType());
-                    newTransaction.setTransactionAmount(transactionRequest.getTransactionAmount());
-                    newTransaction.setDescription(transactionRequest.getDescription());
-                    newTransaction.setTransactionDate(LocalDateTime.now());
-
-                    if (transactionRequest
-                            .getBill()
-                            .getAcquisition()
-                            .getProduct()
-                            .getRules()
-                            .getMaximumLimitMonthlyMovementsQuantity() > 10){
-                        newTransaction.setCommission(2.5);
-                        transactionRequest
-                                .getBill()
-                                .setBalance(transactionRequest.getBill().getBalance() - COMMISSION_PER_TRANSACTION);
-                    }
-                        transactionRequest
-                                .getBill()
-                                .getAcquisition()
-                                .getProduct()
-                                .getRules()
-                                .setMaximumLimitMonthlyMovementsQuantity(20);
-                        acquisitionService.updateAcquisition( transactionRequest
-                                        .getBill()
-                                        .getAcquisition(),
-                                         transactionRequest
-                                        .getBill()
-                                        .getAcquisition().getCardNumber());
-                    return billService.updateBill(transactionRequest.getBill());
-                })
-                .flatMap(bill -> {
-                    newTransaction.setBill(bill);
-                    return transactionService.create(newTransaction);
-                })
-                .flatMap(transactionResponse -> ServerResponse.created(URI.create("/api/transaction/".concat(transactionResponse.getId())))
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .bodyValue(transactionResponse));
+        Acquisition newAcquisition = new Acquisition();
+        return transaction
+               .flatMap(transaction1 -> {
+                   newTransaction.setTransactionType(transaction1.getTransactionType());
+                   newTransaction.setTransactionAmount(transaction1.getTransactionAmount());
+                   newTransaction.setDescription(transaction1.getDescription());
+                   newTransaction.setTransactionDate(LocalDateTime.now());
+                   newTransaction.setBill(transaction1.getBill());
+                   return acquisitionService.findByCardNumber(transaction1.getBill().getAcquisition().getCardNumber());
+               })
+               .flatMap(acquisition1 -> {
+                   if (acquisition1
+                           .getProduct()
+                           .getRules()
+                           .getMaximumLimitMonthlyMovementsQuantity() > 4){
+                       newTransaction.setCommission(2.5);
+                       newTransaction.getBill().setBalance(newTransaction.getBill().getBalance() - COMMISSION_PER_TRANSACTION);
+                   }else{
+                       newTransaction.setCommission(0.0);
+                   }
+                   newAcquisition.setProduct(acquisition1.getProduct());
+                   newAcquisition.setCustomerHolder(acquisition1.getCustomerHolder());
+                   newAcquisition.getProduct().getRules().setMaximumLimitMonthlyMovementsQuantity(acquisition1
+                           .getProduct().getRules().getMaximumLimitMonthlyMovementsQuantity() + 1);
+                   newAcquisition.setCustomerAuthorizedSigner(acquisition1.getCustomerAuthorizedSigner());
+                   newAcquisition.setCardNumber(acquisition1.getCardNumber());
+                   return acquisitionService.updateAcquisition(newAcquisition);
+               }).flatMap(acquisition -> {
+                   return billService.findByCardNumber(acquisition.getCardNumber()).flatMap(bill -> {
+                       bill.setBalance(newTransaction.getBill().getBalance());
+                       bill.setAcquisition(acquisition);
+                       return billService.updateBill(bill);
+                   });
+               }).flatMap(bill -> {
+                   newTransaction.setBill(bill);
+                   return transactionService.create(newTransaction);
+               }).flatMap(transactionResponse -> ServerResponse.created(URI.create("/api/transaction/".concat(newTransaction.getId())))
+                       .contentType(MediaType.APPLICATION_JSON)
+                       .bodyValue(newTransaction));
     }
 
     public Mono<ServerResponse> update(ServerRequest request){
@@ -158,6 +187,11 @@ public class TransactionHandler {
                         .onErrorResume(e -> Mono.error(new MethodArgumentNotValid(
                                 HttpStatus.BAD_REQUEST, String.format("The argument %s is not valid for this method", cardNumber), e))));
     }*/
+
+    public Mono<ServerResponse> generateCommissionPerProductInRange(ServerRequest request){
+        String periode = request.pathVariable("accountNumber");
+        return null;
+    }
 
     private Mono<ServerResponse> errorHandler(Mono<ServerResponse> response){
         return response.onErrorResume(error -> {
