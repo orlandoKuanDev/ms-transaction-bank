@@ -21,6 +21,8 @@ public class RouterConfig {
                 .andRoute(GET("/transaction/bill/acquisition/{cardNumber}"), handler::findByAcquisitionCardNumber)
                 .andRoute(GET("/transaction/period/{period}/dateInit/{dateInit}/product/{productName}"), handler::generateCommissionPerProductInRange)
                 .andRoute(GET("/transaction/between/date/{periodDay}"), handler::transactionBetweenDates)
+                .andRoute(GET("/transaction/top/date/{dateTop}"), handler::transactionTop)
+                .andRoute(GET("/transaction/average/month/{month}"), handler::transactionAverage)
                 .andRoute(POST("/transaction/acquisition/update"), handler::updateAcquisition)
                 .andRoute(POST("/transaction/create"), handler::save)
                 .andRoute(PUT("/transaction/{id}"), handler::update)

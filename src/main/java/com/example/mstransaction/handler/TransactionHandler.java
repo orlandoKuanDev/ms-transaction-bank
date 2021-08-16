@@ -1,6 +1,8 @@
 package com.example.mstransaction.handler;
 
 import com.example.mstransaction.exception.MethodArgumentNotValid;
+import com.example.mstransaction.models.dto.AverageDTO;
+import com.example.mstransaction.models.dto.BalanceDTO;
 import com.example.mstransaction.models.entities.Acquisition;
 import com.example.mstransaction.models.entities.Bill;
 import com.example.mstransaction.models.entities.Transaction;
@@ -19,13 +21,8 @@ import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
 import java.net.URI;
-import java.time.LocalDate;
-import java.time.LocalDateTime;
-import java.time.Period;
-import java.util.Date;
-import java.util.HashMap;
-import java.util.Map;
-import java.util.Objects;
+import java.time.*;
+import java.util.*;
 
 @Component
 @Slf4j(topic = "TRANSACTION_HANDLER")
@@ -124,6 +121,7 @@ public class TransactionHandler {
                            .getProduct().getRules().getMaximumLimitMonthlyMovementsQuantity() + 1);
                    newAcquisition.setCustomerAuthorizedSigner(acquisition1.getCustomerAuthorizedSigner());
                    newAcquisition.setCardNumber(acquisition1.getCardNumber());
+                   newAcquisition.setBill(newTransaction.getBill());
                    return acquisitionService.updateAcquisition(newAcquisition);
                }).flatMap(acquisition -> {
                    return billService.findByCardNumber(acquisition.getCardNumber()).flatMap(bill -> {
@@ -198,6 +196,55 @@ public class TransactionHandler {
                 .flatMap(t -> ServerResponse.ok().contentType(MediaType.APPLICATION_JSON)
                         .bodyValue(t))
                 .switchIfEmpty(ServerResponse.notFound().build());
+    }
+
+    public Mono<ServerResponse> transactionTop(ServerRequest request){
+        String dateTop = request.pathVariable("dateTop");
+        LocalDateTime startDay =  LocalDate.parse(dateTop).atStartOfDay();
+        LocalDateTime sixtyDaysBehind = startDay.plusHours(20);
+        log.info("LIMIT_DATE: {}", sixtyDaysBehind);
+        return transactionService.findByTransactionDateBetween(startDay, sixtyDaysBehind)
+                .reduce((first, last) -> last)
+                .flatMap(t -> ServerResponse.ok().contentType(MediaType.APPLICATION_JSON)
+                        .bodyValue(t))
+                .switchIfEmpty(ServerResponse.notFound().build());
+    }
+
+    public Mono<ServerResponse> transactionAverage(ServerRequest request){
+        String month = request.pathVariable("month");
+        Mono<AverageDTO> averageDTO = Mono.just(new AverageDTO());
+        BalanceDTO balanceDTO = new BalanceDTO();
+        List<BalanceDTO> balanceDTOS = new ArrayList<>();
+        //NUMERO DE DIAS POR MES - AÑO
+        YearMonth yearMonthObject = YearMonth.of(2021, Integer.parseInt(month));
+        int daysInMonth = yearMonthObject.lengthOfMonth();
+        ZoneId zoneId = ZoneId.of ( "America/Bogota" );
+        LocalDate today = LocalDate.now ( zoneId );
+//encuentra primer dia del mes
+        LocalDate firstOfCurrentMonth = today.withDayOfMonth( 1 );
+//encuentra ULTIMO dia del mes
+        LocalDate endOfCurrentMonth = today.withDayOfMonth( daysInMonth );
+        LocalDate start = LocalDate.parse(firstOfCurrentMonth.toString());
+        LocalDate end = LocalDate.parse(endOfCurrentMonth.toString());
+        List<LocalDate> totalDates = new ArrayList<>();
+        while (!start.isAfter(end)) {
+            totalDates.add(start);
+            start = start.plusDays(1);
+        }
+        Mono<List<LocalDate>> dayMoth = Mono.just(totalDates);
+        return null;
+       /* return dayMoth.flatMapMany(Flux::fromIterable)
+                .map(localDate -> {
+                    LocalDateTime startDay =  localDate.atStartOfDay();
+                    LocalDateTime endDay = startDay.plusHours(20);
+                    return transactionService.findByTransactionDateBetween(startDay, endDay)
+                            .reduce((first, last) -> last)
+                            .flatMap(transaction -> {
+                                balanceDTO.setBalance(transaction.getBill().getBalance() == 0.0 ? 1500 : transaction.getBill().getBalance());
+                                balanceDTOS.add(balanceDTO);
+                                return Mono.just(balanceDTOS);
+                            });
+                }).map(listMono -> lis).collectList();*/
     }
 
     public  Mono<ServerResponse> transactionBetweenDates(ServerRequest request){
