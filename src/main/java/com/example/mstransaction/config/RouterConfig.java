@@ -19,6 +19,8 @@ public class RouterConfig {
                 .andRoute(GET("/transaction/acc/{accountNumber}"), handler::findByAccountNumber)
                 .andRoute(GET("/transaction/bill/{accountNumber}"), handler::findAllByAccountNumber)
                 .andRoute(GET("/transaction/bill/acquisition/{cardNumber}"), handler::findByAcquisitionCardNumber)
+                .andRoute(GET("/transaction/period/{period}/dateInit/{dateInit}/product/{productName}"), handler::generateCommissionPerProductInRange)
+                .andRoute(GET("/transaction/between/date/{periodDay}"), handler::transactionBetweenDates)
                 .andRoute(POST("/transaction/acquisition/update"), handler::updateAcquisition)
                 .andRoute(POST("/transaction/create"), handler::save)
                 .andRoute(PUT("/transaction/{id}"), handler::update)

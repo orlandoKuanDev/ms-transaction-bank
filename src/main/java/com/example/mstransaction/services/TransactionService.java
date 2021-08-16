@@ -5,8 +5,10 @@ import com.example.mstransaction.repositories.IRepository;
 import com.example.mstransaction.repositories.ITransactionRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
+import java.time.LocalDateTime;
 import java.util.List;
 
 @Service
@@ -28,4 +30,15 @@ public class TransactionService extends BaseService<Transaction, String> impleme
     public Mono<List<Transaction>> findAllByBill_AccountNumber(String accountNumber) {
         return repository.findAllByBill_AccountNumber(accountNumber);
     }
+
+    @Override
+    public Flux<Transaction> findByTransactionDateBetween(LocalDateTime from, LocalDateTime to) {
+        return repository.findByTransactionDateBetween(from, to);
+    }
+
+    @Override
+    public Flux<Transaction> findByBill_Acquisition_Product_ProductName(String productName) {
+        return repository.findByBill_Acquisition_Product_ProductName(productName);
+    }
+
 }

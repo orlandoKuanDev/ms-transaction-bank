@@ -9,4 +9,6 @@ import java.util.List;
 
 public interface ITransactionRepository extends IRepository<Transaction, String>{
     Mono<List<Transaction>> findAllByBill_AccountNumber(String accountNumber);
-    //Flux<Transaction> findByTransactionDateBetween(LocalDateTime from, LocalDateTime to);
+    Flux<Transaction> findByTransactionDateBetween(LocalDateTime from, LocalDateTime to);
+    Flux<Transaction> findByBill_Acquisition_Product_ProductName(String productName);
+}

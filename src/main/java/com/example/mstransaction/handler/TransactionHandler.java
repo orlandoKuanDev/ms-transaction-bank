@@ -15,13 +15,17 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.reactive.function.client.WebClientResponseException;
 import org.springframework.web.reactive.function.server.ServerRequest;
 import org.springframework.web.reactive.function.server.ServerResponse;
+import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
 import java.net.URI;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.Period;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Objects;
 
 @Component
 @Slf4j(topic = "TRANSACTION_HANDLER")
@@ -159,12 +163,9 @@ public class TransactionHandler {
 
     public Mono<ServerResponse> findAllByAccountNumber(ServerRequest request){
         String accountNumber = request.pathVariable("accountNumber");
-        log.info("ACCOUNT_NUMBER {}", accountNumber);
         Mono<Bill> bill = billService.findByAccountNumber(accountNumber);
         return bill.flatMap(acc -> transactionService.findAll()
                 .filter(list -> {
-                    log.info("ACCOUNT_NUMBER_WEB_CLIENT {}", acc.getAccountNumber());
-                    log.info("ACCOUNT_NUMBER_WEB_CLIENT {}", list.getBill());
                     return list.getBill().getAccountNumber().equals(acc.getAccountNumber());
                 })
                 .collectList())
@@ -176,21 +177,39 @@ public class TransactionHandler {
         );
 	}
 
-    /*public Mono<ServerResponse> findAllByCreditCard(ServerRequest request){
-        String cardNumber = request.pathVariable("cardNumber");
-        return transactionService.findAll()
-                .filter(list -> list.getCreditCard().getCardNumber().equals(cardNumber))
-                .collectList()
-                .flatMap(list -> ServerResponse.ok()
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .bodyValue(list)
-                        .onErrorResume(e -> Mono.error(new MethodArgumentNotValid(
-                                HttpStatus.BAD_REQUEST, String.format("The argument %s is not valid for this method", cardNumber), e))));
-    }*/
-
+    /**
+     *
+     * @param request productName
+     * @param request period
+     * @param request dateInit
+     * @return list of commission by product in range date
+     */
     public Mono<ServerResponse> generateCommissionPerProductInRange(ServerRequest request){
-        String periode = request.pathVariable("accountNumber");
-        return null;
+        String productName = request.pathVariable("productName");
+        String period = request.pathVariable("period");
+        String dateInit = request.pathVariable("dateInit");
+        LocalDate startDay =  LocalDate.parse(dateInit);
+        LocalDate endDay = startDay.plusDays(Integer.parseInt(period));
+        return transactionService.findByBill_Acquisition_Product_ProductName(productName)
+                .flatMap(transaction ->
+                        transactionService.findByTransactionDateBetween(startDay.atStartOfDay(), endDay.atStartOfDay())
+                                .filter(pf -> Objects.equals(pf.getBill().getAcquisition().getProduct().getProductName(), transaction.getBill().getAcquisition().getProduct().getProductName())))
+                .collectList()
+                .flatMap(t -> ServerResponse.ok().contentType(MediaType.APPLICATION_JSON)
+                        .bodyValue(t))
+                .switchIfEmpty(ServerResponse.notFound().build());
+    }
+
+    public  Mono<ServerResponse> transactionBetweenDates(ServerRequest request){
+        String periodDay = request.pathVariable("periodDay");
+        LocalDate aDate = LocalDate.of(2021, 8, 12);
+        LocalDate sixtyDaysBehind = aDate.plusDays(Integer.parseInt(periodDay));
+        log.info("LIMIT_DATE: {}", sixtyDaysBehind);
+        return transactionService.findByTransactionDateBetween(aDate.atStartOfDay(), sixtyDaysBehind.atStartOfDay())
+                .collectList()
+                .flatMap(t -> ServerResponse.ok().contentType(MediaType.APPLICATION_JSON)
+                        .bodyValue(t))
+                .switchIfEmpty(ServerResponse.notFound().build());
     }
 
     private Mono<ServerResponse> errorHandler(Mono<ServerResponse> response){
