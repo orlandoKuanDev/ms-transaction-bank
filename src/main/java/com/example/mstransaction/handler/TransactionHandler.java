@@ -17,8 +17,8 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.reactive.function.client.WebClientResponseException;
 import org.springframework.web.reactive.function.server.ServerRequest;
 import org.springframework.web.reactive.function.server.ServerResponse;
-import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
+import reactor.core.scheduler.Schedulers;
 
 import java.net.URI;
 import java.time.*;
@@ -213,16 +213,14 @@ public class TransactionHandler {
     public Mono<ServerResponse> transactionAverage(ServerRequest request){
         String month = request.pathVariable("month");
         Mono<AverageDTO> averageDTO = Mono.just(new AverageDTO());
-        BalanceDTO balanceDTO = new BalanceDTO();
-        List<BalanceDTO> balanceDTOS = new ArrayList<>();
         //NUMERO DE DIAS POR MES - AÑO
         YearMonth yearMonthObject = YearMonth.of(2021, Integer.parseInt(month));
         int daysInMonth = yearMonthObject.lengthOfMonth();
         ZoneId zoneId = ZoneId.of ( "America/Bogota" );
         LocalDate today = LocalDate.now ( zoneId );
-//encuentra primer dia del mes
+        //encuentra primer dia del mes
         LocalDate firstOfCurrentMonth = today.withDayOfMonth( 1 );
-//encuentra ULTIMO dia del mes
+        //encuentra ULTIMO dia del mes
         LocalDate endOfCurrentMonth = today.withDayOfMonth( daysInMonth );
         LocalDate start = LocalDate.parse(firstOfCurrentMonth.toString());
         LocalDate end = LocalDate.parse(endOfCurrentMonth.toString());
@@ -231,20 +229,26 @@ public class TransactionHandler {
             totalDates.add(start);
             start = start.plusDays(1);
         }
-        Mono<List<LocalDate>> dayMoth = Mono.just(totalDates);
-        return null;
-       /* return dayMoth.flatMapMany(Flux::fromIterable)
-                .map(localDate -> {
-                    LocalDateTime startDay =  localDate.atStartOfDay();
-                    LocalDateTime endDay = startDay.plusHours(20);
-                    return transactionService.findByTransactionDateBetween(startDay, endDay)
-                            .reduce((first, last) -> last)
-                            .flatMap(transaction -> {
-                                balanceDTO.setBalance(transaction.getBill().getBalance() == 0.0 ? 1500 : transaction.getBill().getBalance());
-                                balanceDTOS.add(balanceDTO);
-                                return Mono.just(balanceDTOS);
-                            });
-                }).map(listMono -> lis).collectList();*/
+        return averageDTO.flatMap(averageDTO1 -> {
+            List<Double> balances = new ArrayList<>();
+            double acc =  0.0;
+            for (LocalDate date: totalDates){
+                LocalDateTime startDay =  date.atStartOfDay();
+                LocalDateTime endDay = startDay.plusHours(20);
+                List<Transaction> transaction = transactionService.findByTransactionDateBetween(startDay, endDay).takeLast(1).collectList().toProcessor().block();
+                for (Transaction transaction1: transaction){
+                    balances.add(transaction1.getBill().getBalance() == 0.0 ? 1500 : transaction1.getBill().getBalance());
+                    acc += transaction1.getBill().getBalance() == 0.0 ? 1500 : transaction1.getBill().getBalance();
+                }
+            }
+            averageDTO1.setBalances(balances);
+            double av = balances.stream()
+                    .mapToDouble(Double::doubleValue)
+                    .average().orElse(0.0);
+            averageDTO1.setAverage(av);
+            return Mono.just(averageDTO1);
+        }).flatMap(t -> ServerResponse.ok().contentType(MediaType.APPLICATION_JSON)
+                .bodyValue(t));
     }
 
     public  Mono<ServerResponse> transactionBetweenDates(ServerRequest request){
