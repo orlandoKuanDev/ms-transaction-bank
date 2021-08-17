@@ -23,6 +23,7 @@ import reactor.core.scheduler.Schedulers;
 import java.net.URI;
 import java.time.*;
 import java.util.*;
+import java.util.stream.Collectors;
 
 @Component
 @Slf4j(topic = "TRANSACTION_HANDLER")
@@ -236,6 +237,7 @@ public class TransactionHandler {
                 LocalDateTime startDay =  date.atStartOfDay();
                 LocalDateTime endDay = startDay.plusHours(20);
                 List<Transaction> transaction = transactionService.findByTransactionDateBetween(startDay, endDay).takeLast(1).collectList().toProcessor().block();
+                //List<Transaction> transactions = transaction.stream().filter(transaction1 -> transaction1.getBill().getAcquisition().getProduct().getProductName() == "AHORRO").collect(Collectors.toList());
                 for (Transaction transaction1: transaction){
                     balances.add(transaction1.getBill().getBalance() == 0.0 ? 1500 : transaction1.getBill().getBalance());
                     acc += transaction1.getBill().getBalance() == 0.0 ? 1500 : transaction1.getBill().getBalance();
