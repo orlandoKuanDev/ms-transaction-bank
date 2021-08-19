@@ -65,10 +65,20 @@ public class TransactionHandler {
         );
     }
 
-    public Mono<ServerResponse> findByAcquisitionCardNumber(ServerRequest request){
-        String cardNumber = request.pathVariable("cardNumber");
+    public Mono<ServerResponse> findByAcquisitionIban(ServerRequest request){
+        String iban = request.pathVariable("iban");
         return errorHandler(
-                billService.findByCardNumber(cardNumber).flatMap(p -> ServerResponse.ok()
+                billService.findByIban(iban).flatMap(p -> ServerResponse.ok()
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .bodyValue(p))
+                        .switchIfEmpty(ServerResponse.notFound().build())
+        );
+    }
+
+    public Mono<ServerResponse> findByAcquisitionAccountNumber(ServerRequest request){
+        String accountNumber = request.pathVariable("accountNumber");
+        return errorHandler(
+                acquisitionService.findByBillAccountNumber(accountNumber).flatMap(p -> ServerResponse.ok()
                                 .contentType(MediaType.APPLICATION_JSON)
                                 .bodyValue(p))
                         .switchIfEmpty(ServerResponse.notFound().build())
@@ -83,15 +93,6 @@ public class TransactionHandler {
                 .switchIfEmpty(ServerResponse.notFound().build());
     }
 
-    public Mono<ServerResponse> findByCardNumber(ServerRequest request){
-        String cardNumber = request.pathVariable("cardNumber");
-        return errorHandler(
-                acquisitionService.findByCardNumber(cardNumber).flatMap(p -> ServerResponse.ok()
-                                .contentType(MediaType.APPLICATION_JSON)
-                                .bodyValue(p))
-                        .switchIfEmpty(ServerResponse.notFound().build())
-        );
-    }
 
     public Mono<ServerResponse> save(ServerRequest request){
         Mono<Transaction> transaction = request.bodyToMono(Transaction.class);
@@ -104,7 +105,7 @@ public class TransactionHandler {
                    newTransaction.setDescription(transaction1.getDescription());
                    newTransaction.setTransactionDate(LocalDateTime.now());
                    newTransaction.setBill(transaction1.getBill());
-                   return acquisitionService.findByCardNumber(transaction1.getBill().getAcquisition().getCardNumber());
+                   return acquisitionService.findByBillAccountNumber(transaction1.getBill().getAccountNumber());
                })
                .flatMap(acquisition1 -> {
                    if (acquisition1
@@ -121,11 +122,11 @@ public class TransactionHandler {
                    newAcquisition.getProduct().getRules().setMaximumLimitMonthlyMovementsQuantity(acquisition1
                            .getProduct().getRules().getMaximumLimitMonthlyMovementsQuantity() + 1);
                    newAcquisition.setCustomerAuthorizedSigner(acquisition1.getCustomerAuthorizedSigner());
-                   newAcquisition.setCardNumber(acquisition1.getCardNumber());
+                   newAcquisition.setIban(acquisition1.getIban());
                    newAcquisition.setBill(newTransaction.getBill());
                    return acquisitionService.updateAcquisition(newAcquisition);
                }).flatMap(acquisition -> {
-                   return billService.findByCardNumber(acquisition.getCardNumber()).flatMap(bill -> {
+                   return billService.findByAccountNumber(acquisition.getBill().getAccountNumber()).flatMap(bill -> {
                        bill.setBalance(newTransaction.getBill().getBalance());
                        bill.setAcquisition(acquisition);
                        return billService.updateBill(bill);

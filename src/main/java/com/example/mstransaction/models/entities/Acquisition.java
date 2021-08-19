@@ -18,8 +18,8 @@ public class Acquisition {
     @Field(name = "authorizedSigner")
     private List<Customer> customerAuthorizedSigner;
 
-    @Field(name = "cardNumber")
-    private String cardNumber;
+    @Field(name = "iban")
+    private String iban;
 
     @Field(name = "bill")
     private Bill bill;

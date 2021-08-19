@@ -48,18 +48,18 @@ public class BillService {
                 .bodyToMono(Bill.class);
     }
 
-    public Mono<Bill> findByCardNumber(String cardNumber) {
+    public Mono<Bill> findByIban(String iban) {
         return webClientBuilder
                 .baseUrl("http://SERVICE-BILL/bill")
                 .build()
                 .get()
-                .uri("/acquisition/{cardNumber}", Collections.singletonMap("cardNumber", cardNumber))
+                .uri("/acquisition/{iban}", Collections.singletonMap("iban", iban))
                 .accept(APPLICATION_JSON)
                 .retrieve()
                 .onStatus(HttpStatus::isError, response -> {
                     logTraceResponse(logger, response);
                     return Mono.error(new ArgumentWebClientNotValid(
-                            String.format("THE CARD NUMBER DONT EXIST IN MICRO SERVICE BILL-> %s", cardNumber)
+                            String.format("THE IBAN DONT EXIST IN MICRO SERVICE BILL-> %s", iban)
                     ));
                 })
                 .bodyToMono(Bill.class);

@@ -30,12 +30,27 @@ public class AcquisitionService {
         this.webClientBuilder = webClientBuilder;
     }
 
-    public Mono<Acquisition> findByCardNumber(String cardNumber) {
+    public Mono<Acquisition> findByBillAccountNumber(String accountNumber) {
         return webClientBuilder
                 .baseUrl("http://SERVICE-ACQUISITION/acquisition")
                 .build()
                 .get()
-                .uri("/card/{cardNumber}", Collections.singletonMap("cardNumber", cardNumber))
+                .uri("/bill/{accountNumber}", Collections.singletonMap("accountNumber", accountNumber))
+                .accept(APPLICATION_JSON)
+                .retrieve()
+                .onStatus(HttpStatus::isError, response -> {
+                    logTraceResponse(logger, response);
+                    return Mono.error(new RuntimeException("THE ACQUISITION FIND FAILED"));
+                })
+                .bodyToMono(Acquisition.class);
+    }
+
+    public Mono<Acquisition> findByIban(String iban) {
+        return webClientBuilder
+                .baseUrl("http://SERVICE-ACQUISITION/acquisition")
+                .build()
+                .get()
+                .uri("/card/{iban}", Collections.singletonMap("iban", iban))
                 .accept(APPLICATION_JSON)
                 .retrieve()
                 .onStatus(HttpStatus::isError, response -> {
