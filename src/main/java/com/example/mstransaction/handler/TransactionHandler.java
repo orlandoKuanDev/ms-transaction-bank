@@ -297,7 +297,7 @@ public class TransactionHandler {
             y.setAverage(av);
             return y;
         })
-                .collectList()
+                .last()
                 .log()
                 .flatMap(t -> ServerResponse.ok().contentType(MediaType.APPLICATION_JSON)
                 .bodyValue(t));
