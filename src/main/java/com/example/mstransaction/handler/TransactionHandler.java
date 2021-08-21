@@ -2,12 +2,12 @@ package com.example.mstransaction.handler;
 
 import com.example.mstransaction.exception.MethodArgumentNotValid;
 import com.example.mstransaction.models.dto.AverageDTO;
-import com.example.mstransaction.models.dto.BalanceDTO;
 import com.example.mstransaction.models.entities.Acquisition;
 import com.example.mstransaction.models.entities.Bill;
 import com.example.mstransaction.models.entities.Transaction;
 import com.example.mstransaction.services.AcquisitionService;
 import com.example.mstransaction.services.BillService;
+import com.example.mstransaction.services.CustomerService;
 import com.example.mstransaction.services.ITransactionService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -17,8 +17,8 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.reactive.function.client.WebClientResponseException;
 import org.springframework.web.reactive.function.server.ServerRequest;
 import org.springframework.web.reactive.function.server.ServerResponse;
+import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
-import reactor.core.scheduler.Schedulers;
 
 import java.net.URI;
 import java.time.*;
@@ -32,12 +32,13 @@ public class TransactionHandler {
     private final ITransactionService transactionService;
     private final BillService billService;
     private final AcquisitionService acquisitionService;
-
+    private final CustomerService customerService;
     @Autowired
-    public TransactionHandler(ITransactionService transactionService, BillService billService, AcquisitionService acquisitionService) {
+    public TransactionHandler(ITransactionService transactionService, BillService billService, AcquisitionService acquisitionService, CustomerService customerService) {
         this.transactionService = transactionService;
         this.billService = billService;
         this.acquisitionService = acquisitionService;
+        this.customerService = customerService;
     }
 
     public Mono<ServerResponse> findAll(ServerRequest request){
@@ -212,8 +213,9 @@ public class TransactionHandler {
                 .switchIfEmpty(ServerResponse.notFound().build());
     }
 
-    public Mono<ServerResponse> transactionAverage(ServerRequest request){
+    /*public Mono<ServerResponse> transactionAverage(ServerRequest request){
         String month = request.pathVariable("month");
+        String accountNumber = request.pathVariable("accountNumber");
         Mono<AverageDTO> averageDTO = Mono.just(new AverageDTO());
         //NUMERO DE DIAS POR MES - AÑO
         YearMonth yearMonthObject = YearMonth.of(2021, Integer.parseInt(month));
@@ -237,8 +239,8 @@ public class TransactionHandler {
             for (LocalDate date: totalDates){
                 LocalDateTime startDay =  date.atStartOfDay();
                 LocalDateTime endDay = startDay.plusHours(20);
-                List<Transaction> transaction = transactionService.findByTransactionDateBetween(startDay, endDay).takeLast(1).collectList().toProcessor().block();
-                //List<Transaction> transactions = transaction.stream().filter(transaction1 -> transaction1.getBill().getAcquisition().getProduct().getProductName() == "AHORRO").collect(Collectors.toList());
+                List<Transaction> transaction = transactionService.findByTransactionDateBetween(startDay, endDay).filter(transactionFilter -> Objects.equals(transactionFilter.getBill().getAccountNumber(), accountNumber)).takeLast(1).collectList().toProcessor().block();
+
                 for (Transaction transaction1: transaction){
                     balances.add(transaction1.getBill().getBalance() == 0.0 ? 1500 : transaction1.getBill().getBalance());
                     acc += transaction1.getBill().getBalance() == 0.0 ? 1500 : transaction1.getBill().getBalance();
@@ -251,6 +253,53 @@ public class TransactionHandler {
             averageDTO1.setAverage(av);
             return Mono.just(averageDTO1);
         }).flatMap(t -> ServerResponse.ok().contentType(MediaType.APPLICATION_JSON)
+                .bodyValue(t));
+    }*/
+
+    public Mono<ServerResponse> transactionAverageV2(ServerRequest request){
+        String month = request.pathVariable("month");
+        String accountNumber = request.pathVariable("accountNumber");
+        Mono<AverageDTO> averageDTO = Mono.just(new AverageDTO());
+
+        YearMonth yearMonthObject = YearMonth.of(2021, Integer.parseInt(month));
+        int daysInMonth = yearMonthObject.lengthOfMonth();
+        ZoneId zoneId = ZoneId.of ( "America/Bogota" );
+        LocalDate today = LocalDate.now ( zoneId );
+        LocalDate firstOfCurrentMonth = today.withDayOfMonth( 1 );
+
+        LocalDate endOfCurrentMonth = today.withDayOfMonth( daysInMonth );
+        LocalDate start = LocalDate.parse(firstOfCurrentMonth.toString());
+        LocalDate end = LocalDate.parse(endOfCurrentMonth.toString());
+        List<LocalDate> totalDates = new ArrayList<>();
+        while (!start.isAfter(end)) {
+            totalDates.add(start);
+            start = start.plusDays(1);
+        }
+
+        Mono<List<Transaction>> transactionFlux = Flux.fromIterable(totalDates).flatMapSequential(daysInMonthByYear -> {
+            LocalDateTime startDay =  daysInMonthByYear.atStartOfDay();
+            LocalDateTime endDay = startDay.plusHours(20);
+           return transactionService.findByTransactionDateBetween(startDay, endDay).filter(transactionFilter -> Objects.equals(transactionFilter.getBill().getAccountNumber(), accountNumber)).takeLast(1);
+        }).collectList();
+
+        return Flux.zip(averageDTO, transactionFlux)
+                .flatMapSequential(result -> {
+                    List<Double> totalBalance = result.getT2().stream()
+                            .map(ts -> ts.getBill().getBalance())
+                            .collect(Collectors.toList());
+                    result.getT1().setBalances(totalBalance);
+            return Flux.just(result);
+        }).zipWith(averageDTO, (x, y) ->{
+            double av = x.getT1().getBalances().stream()
+                    .mapToDouble(Double::doubleValue)
+                    .average()
+                    .orElse(0.0);
+            y.setAverage(av);
+            return y;
+        })
+                .collectList()
+                .log()
+                .flatMap(t -> ServerResponse.ok().contentType(MediaType.APPLICATION_JSON)
                 .bodyValue(t));
     }
 
