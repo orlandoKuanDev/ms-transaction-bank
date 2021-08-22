@@ -78,12 +78,10 @@ public class TransactionHandler {
 
     public Mono<ServerResponse> findByAcquisitionAccountNumber(ServerRequest request){
         String accountNumber = request.pathVariable("accountNumber");
-        return errorHandler(
-                acquisitionService.findByBillAccountNumber(accountNumber).flatMap(p -> ServerResponse.ok()
-                                .contentType(MediaType.APPLICATION_JSON)
-                                .bodyValue(p))
-                        .switchIfEmpty(ServerResponse.notFound().build())
-        );
+        return    acquisitionService.findByBillAccountNumber(accountNumber).flatMap(p -> ServerResponse.ok()
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .bodyValue(p))
+                .switchIfEmpty(ServerResponse.notFound().build());
     }
 
     public Mono<ServerResponse> updateAcquisition(ServerRequest request){
@@ -282,7 +280,9 @@ public class TransactionHandler {
            return transactionService.findByTransactionDateBetween(startDay, endDay).filter(transactionFilter -> Objects.equals(transactionFilter.getBill().getAccountNumber(), accountNumber)).takeLast(1);
         }).collectList();
 
-        return Flux.zip(averageDTO, transactionFlux)
+        Mono<Acquisition> acquisitionMono = acquisitionService.findByBillAccountNumber(accountNumber);
+
+        return Flux.zip(averageDTO, transactionFlux, acquisitionMono)
                 .flatMapSequential(result -> {
                     List<Double> totalBalance = result.getT2().stream()
                             .map(ts -> ts.getBill().getBalance())
@@ -290,6 +290,8 @@ public class TransactionHandler {
                     result.getT1().setBalances(totalBalance);
             return Flux.just(result);
         }).zipWith(averageDTO, (x, y) ->{
+            String productName = x.getT3().getProduct().getProductName();
+            y.setProductName(productName);
             double av = x.getT1().getBalances().stream()
                     .mapToDouble(Double::doubleValue)
                     .average()
