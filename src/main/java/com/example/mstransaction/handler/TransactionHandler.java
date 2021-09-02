@@ -211,7 +211,7 @@ public class TransactionHandler {
                 .switchIfEmpty(ServerResponse.notFound().build());
     }
 
-    /*public Mono<ServerResponse> transactionAverage(ServerRequest request){
+    public Mono<ServerResponse> transactionAverage(ServerRequest request){
         String month = request.pathVariable("month");
         String accountNumber = request.pathVariable("accountNumber");
         Mono<AverageDTO> averageDTO = Mono.just(new AverageDTO());
@@ -252,7 +252,7 @@ public class TransactionHandler {
             return Mono.just(averageDTO1);
         }).flatMap(t -> ServerResponse.ok().contentType(MediaType.APPLICATION_JSON)
                 .bodyValue(t));
-    }*/
+    }
 
     public Mono<ServerResponse> transactionAverageV2(ServerRequest request){
         String month = request.pathVariable("month");
